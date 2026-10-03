@@ -1,0 +1,298 @@
+/* Shared look for dashboard pages.
+ *
+ * The whole visual language lives here, and each page overrides only its own
+ * token block.
+ *
+ * Three rules do most of the work:
+ *   1. Hairlines, never drop shadows. A 1px line at 12% ink reads as precision;
+ *      a soft shadow reads as a 2016 SaaS card.
+ *   2. Every numeral is mono and tabular, so columns of figures line up and the
+ *      thing reads as an instrument rather than a web page.
+ *   3. Exactly one accent, spent only on the active state, the primary action and
+ *      the single most important series. Everything else is ink at some opacity.
+ */
+
+@font-face{font-family:"Geist Variable";font-style:normal;font-weight:100 900;font-display:swap;
+  src:url("/fonts/geist-latin-wght.woff2") format("woff2");}
+@font-face{font-family:"Geist Mono Variable";font-style:normal;font-weight:100 900;font-display:swap;
+  src:url("/fonts/geist-mono-latin-wght.woff2") format("woff2");}
+
+:root {
+  /* Overridden per page — these are the neutral defaults. */
+  --bg: #fbfbfa;
+  --panel: #ffffff;
+  --raised: #f4f4f2;
+  --ink: #14140f;
+  --muted: #6f6f68;
+  --faint: #a3a39c;
+  --line: #e6e6e1;
+  --line-soft: #f0f0ec;
+  --accent: #1d4ed8;
+  --accent-ink: #ffffff;
+  --accent-soft: #eaeffc;
+
+  --pos: #0f7b4f;
+  --neg: #c2352b;
+  --warn: #b4690e;
+  --info: #2563eb;
+
+  --r: 6px;
+  --r-sm: 4px;
+  --r-lg: 10px;
+
+  --sans: "Geist Variable", ui-sans-serif, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --ease: cubic-bezier(.22, .7, .2, 1);
+  --fast: .16s var(--ease);
+  --slow: .34s var(--ease);
+
+  --pad: 20px;
+  --gap: 14px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0 }
+
+html { color-scheme: light dark }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.55 var(--sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── type ────────────────────────────────────────────────────────────────── */
+h1, h2, h3 { font-weight: 560; letter-spacing: -.015em; line-height: 1.25 }
+h1 { font-size: 16px }
+h2 { font-size: 14px }
+
+/* The label style that carries most of the "considered" feeling: small, tracked
+   out, muted, never bold. */
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.num, .kpi-val, td.n, th.n {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero";
+}
+
+.dim { color: var(--muted) }
+.faint { color: var(--faint) }
+.pos { color: var(--pos) } .neg { color: var(--neg) } .warn { color: var(--warn) }
+
+/* ── surfaces ────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px var(--pad);
+  border-bottom: 1px solid var(--line-soft);
+  min-height: 44px;
+}
+.panel-head h2 { font-size: 13px; font-weight: 550 }
+.panel-head .spacer { flex: 1 }
+.panel-body { padding: var(--pad) }
+
+/* ── controls ────────────────────────────────────────────────────────────── */
+.btn {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), color var(--fast);
+  white-space: nowrap;
+}
+.btn:hover { background: var(--raised); border-color: var(--faint) }
+.btn:active { transform: translateY(.5px) }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+.btn.primary:hover { filter: brightness(1.08) }
+.btn:focus-visible, .seg > *:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+
+/* Segmented control: the moving pill is one absolutely-positioned element rather
+   than a background on each button, so switching options slides instead of
+   blinking — the cheapest motion that reads as considered. */
+.seg {
+  position: relative;
+  display: inline-flex;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.seg > * {
+  position: relative;
+  z-index: 1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color var(--fast);
+}
+.seg > *.on { color: var(--ink) }
+.seg > *:hover { color: var(--ink) }
+.seg .pill {
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  bottom: 2px;
+  background: var(--panel);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--line);
+  transition: transform var(--slow), width var(--slow);
+  pointer-events: none;
+}
+
+select, input[type=text], input[type=search], input[type=number], input[type=date] {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  outline: none;
+  transition: border-color var(--fast);
+}
+select:hover, input:hover { border-color: var(--faint) }
+select { cursor: pointer }
+
+.chip {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 2px 9px;
+  cursor: pointer;
+  transition: all var(--fast);
+}
+.chip.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft) }
+
+.tag {
+  font-size: 10.5px;
+  font-weight: 500;
+  font-family: var(--mono);
+  border-radius: 3px;
+  padding: 1.5px 6px;
+  border: 1px solid currentColor;
+  opacity: .9;
+}
+
+/* ── tables ──────────────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 12.5px }
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel);
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 9px var(--pad);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  user-select: none;
+}
+thead th.sortable { cursor: pointer }
+thead th.sortable:hover { color: var(--ink) }
+thead th .caret { opacity: 0; margin-left: 4px; transition: opacity var(--fast) }
+thead th[data-dir] .caret { opacity: 1; color: var(--accent) }
+tbody td { padding: 9px var(--pad); border-bottom: 1px solid var(--line-soft) }
+tbody tr { transition: background var(--fast) }
+tbody tr:hover { background: var(--raised) }
+tbody tr:last-child td { border-bottom: 0 }
+td.n, th.n { text-align: right }
+
+/* ── motion ──────────────────────────────────────────────────────────────── */
+/* Entrance is opacity plus a 6px rise — enough to register as arrival, small
+   enough that nothing appears to fly in. Kit.reveal() sets --i for the stagger. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+[data-reveal].in {
+  opacity: 1;
+  transform: none;
+  transition: opacity .42s var(--ease) calc(var(--i, 0) * 28ms),
+              transform .42s var(--ease) calc(var(--i, 0) * 28ms);
+}
+
+@keyframes kit-pulse { 0% { opacity: 1 } 50% { opacity: .25 } 100% { opacity: 1 } }
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--pos);
+  animation: kit-pulse 2.2s var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+  [data-reveal] { opacity: 1; transform: none }
+}
+
+/* ── scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--faint) }
+::-webkit-scrollbar-track { background: transparent }
+
+/* ── theme toggle ────────────────────────────────────────────────────────── */
+.kit-theme{
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+  transition: color var(--fast), background var(--fast), border-color var(--fast);
+}
+.kit-theme:hover{ color: var(--ink); background: var(--raised) }
+.kit-theme svg{ width: 15px; height: 15px }
+/* The floating variant is for pages whose header has nowhere to put it. */
+.kit-theme-float{
+  position: fixed; right: 16px; bottom: 16px; z-index: 9998;
+  width: 34px; height: 34px;
+  background: var(--panel);
+  border-color: var(--line);
+}
+.kit-theme-float:hover{ background: var(--raised) }

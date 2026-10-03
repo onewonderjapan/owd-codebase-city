@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>コード・シティ · GitHub リポジトリ可視化</title>
+<style>
+/* React 的挂载点不能占一层盒子：body 直接就是页面的 flex / grid 容器，
+   中间多一个 <div id="root"> 会掐断 height:100% 的参照链 —— 撑满视口的版面
+   会退化成按内容无限长高。display:contents 让它不生成盒子，
+   版面保持设计时的父子关系。 */
+#root{display:contents}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

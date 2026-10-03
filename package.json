@@ -1,0 +1,53 @@
+{
+  "name": "codebase-city",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
+    "preview": "vite preview",
+    "start": "NODE_ENV=production node dist/boot.js",
+    "check": "tsc -b",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "2.0.78",
+    "@hono/node-server": "^1.14.3",
+    "@tanstack/react-query": "^5.90.16",
+    "@trpc/client": "^11.8.1",
+    "@trpc/react-query": "^11.8.1",
+    "@trpc/server": "^11.8.1",
+    "adm-zip": "^0.6.1",
+    "ai": "6.0.290",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "echarts": "^5.6.0",
+    "hono": "^4.8.3",
+    "mysql2": "^3.14.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "superjson": "^2.2.6",
+    "three": "^0.170.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@hono/vite-dev-server": "^0.19.0",
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^25.0.3",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "drizzle-kit": "^0.31.8",
+    "esbuild": "^0.27.2",
+    "prettier": "^3.7.4",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.14",
+    "vitest": "^4.0.16"
+  }
+}

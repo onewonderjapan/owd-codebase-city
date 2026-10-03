@@ -1,0 +1,203 @@
+/* 把一个代码库画成一座等距的城，是为了回答文件树回答不了的三个问题：
+ *   哪里最重、哪里最乱、谁在跟谁说话。
+ *
+ * 三条设计约定，都可以在画面上逐条验证：
+ *   1. 地块 = 目录，楼 = 文件，楼高 = 行数，楼的层数 = 被依赖次数。
+ *      于是「一栋孤零零的高楼」在图上就是「一个又大又没人用的文件」，
+ *      而这正是重构时最先要看的东西。
+ *   2. 依赖是会动的。数据点沿着依赖边爬行，方向就是 import 的方向。
+ *      静态的连线在超过三十条之后必然变成毛球，动点则能被余光跟住。
+ *   3. 正交投影，不是透视。等距图的价值在于「同样大的东西在画面上同样大」，
+ *      一旦有了透视，远处的模块就会显得比它实际上更小 —— 那是在骗人。
+ *
+ * 观感取蓝图晒图那一路：米黄纸、赭石线、顶面加斜线晕滃。
+ * 晕滃是着色器画的（只在朝上的面），因为这是整张图唯一需要「手绘感」的地方。 */
+
+:root{
+  /* 全息指挥台：近黑底、荧光青主色、品红/琥珀做族群色 */
+  --bg:#04070c; --panel:#080d15; --raised:#0d1522; --ink:#d7e6ee;
+  --muted:#7d94a6; --faint:#46596b; --line:#182637; --line-soft:#111c2a;
+  --accent:#22e6d6; --accent-ink:#02100e; --accent-soft:#0d2b2e;
+  --r:4px; --r-sm:3px;
+  --k1:#22e6d6; --k2:#8f6bff; --k3:#37a6ff; --k4:#ff4fa3; --k5:#ffc233; --k6:#4fe07a;
+  --mark-lo:#ffc233; --mark-md:#ff7a2e; --mark-hi:#ff3d5e;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:12px}
+
+#app{display:grid;grid-template-columns:250px 1fr 268px;height:100vh}
+#app.closed{grid-template-columns:250px 1fr 0}
+@media (max-width:1120px){#app{grid-template-columns:210px 1fr 240px}}
+
+/* ── 左：仓库树 ─────────────────────────────────────────────────── */
+aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0;
+  background-image:repeating-linear-gradient(0deg,transparent 0 3px,#22e6d604 3px 4px)}
+.hd{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
+.hd h1{font-size:13.5px;font-weight:600;letter-spacing:.01em}
+.hd .repo{font-size:10px;color:var(--faint);margin-top:5px;letter-spacing:.05em}
+.hd .kpis{display:flex;gap:16px;margin-top:11px}
+.hd .kpis b{display:block;font-size:15px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hd .kpis i{font-style:normal;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+
+.q{padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+.q input{width:100%;font-family:var(--mono);font-size:11.5px;background:var(--bg);
+  border-color:var(--line);padding:5px 8px}
+
+.tree{flex:1;min-height:0;overflow:auto;padding:6px 0 12px}
+.tr{display:flex;align-items:center;gap:7px;padding:3.5px 14px;cursor:pointer;
+  border-left:2px solid transparent;white-space:nowrap;transition:background var(--fast)}
+.tr:hover{background:var(--raised)}
+.tr.on{background:var(--raised);border-left-color:var(--accent);box-shadow:inset 2px 0 12px #22e6d622}
+.tr .sw{width:7px;height:7px;border-radius:1px;flex:none}
+.tr .nm{flex:1;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+.tr .lc{font-size:9.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.tr.dir .nm{font-weight:600;letter-spacing:.02em}
+.tr.dir .lc{color:var(--muted)}
+
+/* ── 中：城 ─────────────────────────────────────────────────────── */
+#stage{position:relative;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0;cursor:grab}
+canvas.drag{cursor:grabbing}
+#tip{position:absolute;z-index:3;pointer-events:none;display:none;transform:translate(14px,-50%);
+  background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--ink);
+  border-radius:2px;padding:5px 8px;font-size:10.5px;line-height:1.6;white-space:nowrap}
+#tip b{color:var(--accent)}
+
+/* width:max-content 是这里的关键。绝对定位元素的可用宽度是「包含块宽度 − left」，
+   而 left:50%，所以不写 width 的话它只按半屏来收缩 —— 明明还有一半空间就开始换行。 */
+#bar{position:absolute;left:50%;bottom:15px;transform:translateX(-50%);z-index:4;
+  display:flex;gap:4px;align-items:center;background:color-mix(in srgb,var(--panel) 92%,transparent);
+  border:1px solid var(--line);border-radius:99px;padding:5px 7px;backdrop-filter:blur(6px);
+  width:max-content;max-width:calc(100% - 28px);flex-wrap:wrap;justify-content:center}
+#zlvl{font-family:var(--mono);min-width:44px;letter-spacing:0}
+.tb{font:inherit;font-size:10.5px;color:var(--muted);background:none;border:0;border-radius:99px;
+  padding:5px 10px;cursor:pointer;transition:all var(--fast);white-space:nowrap;letter-spacing:.04em}
+.tb:hover{color:var(--ink);background:var(--raised)}
+.tb.on{color:var(--accent-ink);background:var(--accent)}
+.vsep{width:1px;height:15px;background:var(--line);margin:0 3px}
+
+#legend{position:absolute;left:16px;bottom:15px;z-index:3;font-size:9.5px;color:var(--muted);
+  line-height:1.9;letter-spacing:.03em;pointer-events:none}
+#legend i{display:inline-block;width:7px;height:7px;border-radius:1px;margin-right:5px}
+#crumb{position:absolute;left:16px;top:13px;z-index:3;font-size:10px;color:var(--faint);letter-spacing:.08em}
+#crumb b{color:var(--ink);font-weight:600}
+
+/* ── 右：详情 ───────────────────────────────────────────────────── */
+#side{border-left:1px solid var(--line);background:var(--panel);overflow:auto;min-width:0}
+.dt{padding:16px 17px}
+.dt .kind{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.dt h2{font-size:14px;font-weight:600;margin-top:7px;word-break:break-all;line-height:1.45}
+.dt .note{font-size:11.5px;line-height:1.8;color:var(--muted);margin-top:10px}
+.dt dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-top:13px;font-size:11px}
+.dt dt{color:var(--faint)}
+.dt dd{font-variant-numeric:tabular-nums;text-align:right}
+.dt h3{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);
+  margin:16px 0 7px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.dep{display:flex;align-items:center;gap:7px;padding:4px 7px;margin:0 -7px;border-radius:2px;
+  cursor:pointer;font-size:11px}
+.dep:hover{background:var(--raised)}
+.dep .sw{width:6px;height:6px;border-radius:1px;flex:none}
+.dep span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+.empty{padding:22px 17px;font-size:11.5px;color:var(--faint);line-height:1.9}
+#gate{position:absolute;inset:0;z-index:9;display:none;place-content:center;text-align:center;
+  background:var(--bg);color:var(--muted);font-size:12px;line-height:2;padding:40px}
+
+/* ── 仓库加载区 ─────────────────────────────────────────────────── */
+.load{padding:10px 14px;border-bottom:1px solid var(--line-soft);display:flex;flex-direction:column;gap:7px}
+.load .row{display:flex;gap:6px}
+.load input{flex:1;min-width:0;font-family:var(--mono);font-size:11.5px;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 8px;color:var(--ink)}
+.load input:focus{outline:1px solid var(--accent)}
+.load .go{font:inherit;font-size:11px;font-weight:600;background:var(--accent);color:var(--accent-ink);border:0;
+  border-radius:var(--r-sm);padding:6px 13px;cursor:pointer;flex:none;box-shadow:0 0 14px #22e6d655}
+.load .go:hover:not(:disabled){box-shadow:0 0 22px #22e6d688}
+.load .go:disabled{opacity:.45;cursor:default}
+.load .tok{align-self:flex-start;font:inherit;font-size:9.5px;color:var(--faint);background:none;
+  border:0;padding:0;cursor:pointer;letter-spacing:.04em}
+.load .tok:hover{color:var(--ink)}
+.prog{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--muted);line-height:1.6}
+.prog .spin{width:11px;height:11px;flex:none;border:1.5px solid var(--faint);border-top-color:var(--accent);
+  border-radius:50%;animation:rot 0.8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.err{font-size:10.5px;color:#ff8296;line-height:1.6;background:#2a0d16cc;border:1px solid #5c1f30;
+  border-radius:var(--r-sm);padding:6px 8px}
+.recent{font-size:9.5px;color:var(--faint);line-height:2}
+.recent button{font:inherit;font-size:9.5px;color:var(--muted);background:var(--raised);
+  border:0;border-radius:99px;padding:2px 8px;margin:0 4px 4px 0;cursor:pointer}
+.recent button:hover{color:var(--ink);background:var(--accent-soft)}
+
+.kpis b.warn{color:var(--mark-hi);text-shadow:0 0 10px #ff3d5e66}
+
+/* 树上的问题小圆点 */
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:6px;vertical-align:1px}
+.dot.r1,.dot.low{background:var(--mark-lo)}
+.dot.r2,.dot.medium{background:var(--mark-md)}
+.dot.r3,.dot.high{background:var(--mark-hi)}
+.tr.iso .nm{color:var(--faint)}
+
+/* ── 标记模式 ───────────────────────────────────────────────────── */
+.tb.mark.on{background:var(--mark-hi);color:#fff;text-shadow:0 0 6px #ff3d5e88}
+.tb:disabled{opacity:.4;cursor:default}
+.markkey{margin-top:4px;color:var(--mark-hi);font-weight:600;text-shadow:0 0 8px #ff3d5e55}
+
+/* ── 右栏：页签 + 问题清单 ─────────────────────────────────────── */
+.tabs{display:flex;gap:2px;align-items:center;padding:10px 12px 0;position:sticky;top:0;
+  background:var(--panel);z-index:2;border-bottom:1px solid var(--line-soft)}
+.tabs button{font:inherit;font-size:10.5px;color:var(--faint);background:none;border:0;
+  padding:7px 10px;cursor:pointer;letter-spacing:.05em;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs button:disabled{opacity:.4;cursor:default}
+.tabs b{font-weight:600;color:var(--mark-hi);margin-left:2px}
+.tabs .x{margin-left:auto;font-size:14px;padding:7px 8px;display:none}
+
+.issues{padding:12px 14px 20px;display:flex;flex-direction:column;gap:10px}
+.iss{border:1px solid var(--line);border-radius:var(--r);padding:10px 11px;background:var(--bg)}
+.iss.high{border-color:#5c1f30;background:#120a10}
+.iss .hd2{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600}
+.iss .hd2 .dot{margin-left:0}
+.iss .hd2 .tt{flex:1;min-width:0}
+.iss .tag{font-size:8.5px;font-weight:400;letter-spacing:.08em;color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:1.5px 7px;flex:none}
+.iss .sev{font-size:8.5px;color:var(--faint);flex:none}
+.iss.high .sev{color:var(--mark-hi);font-weight:600}
+.iss .dtl{font-size:10.5px;line-height:1.8;color:var(--muted);margin-top:7px}
+.iss .acts{margin-top:8px}
+.iss .acts button{font:inherit;font-size:9.5px;color:var(--accent);background:none;
+  border:1px solid var(--accent);border-radius:99px;padding:3px 10px;cursor:pointer;letter-spacing:.05em}
+.iss .acts button:hover{background:var(--accent);color:var(--accent-ink)}
+.iss .fl{margin-top:6px;max-height:220px;overflow:auto}
+.iss .more{font-size:9.5px;color:var(--faint);padding:4px 7px}
+
+.dt .flag{font-size:10.5px;line-height:1.7;margin-top:10px;padding:6px 8px;border-radius:var(--r-sm);
+  background:#2a0d16cc;border:1px solid #5c1f30;color:#ff8296}
+
+/* ── 移动端 ─────────────────────────────────────────────────────── */
+#menu{display:none}
+#fab{display:none}
+.scrim{display:none}
+
+@media (max-width:860px){
+  #app,#app.closed{grid-template-columns:1fr}
+  aside{position:fixed;left:0;top:0;bottom:0;width:min(84vw,320px);z-index:20;
+    transform:translateX(-102%);transition:transform .25s ease;box-shadow:6px 0 24px #3a352722}
+  #app.drawer aside{transform:none}
+  .scrim{display:block;position:fixed;inset:0;z-index:15;background:#33301f55}
+  #menu{display:grid;place-content:center;position:absolute;left:10px;top:10px;z-index:5;
+    width:44px;height:44px;font-size:16px;color:var(--ink);background:color-mix(in srgb,var(--panel) 92%,transparent);
+    border:1px solid var(--line);border-radius:var(--r);cursor:pointer}
+  #crumb{left:64px;right:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #legend{display:none}
+  #bar{bottom:12px;padding:4px 5px;gap:2px;overflow-x:auto;flex-wrap:nowrap;justify-content:flex-start}
+  .tb{padding:8px 10px;min-height:44px}
+  .vsep{flex:none}
+  #fab{display:block;position:absolute;right:12px;bottom:76px;z-index:5;font:inherit;font-size:11px;
+    color:var(--accent-ink);background:var(--accent);border:0;border-radius:99px;
+    padding:12px 16px;min-height:44px;cursor:pointer;box-shadow:0 3px 12px #3a352744}
+  #side{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:20;max-height:72vh;
+    border-left:0;border-top:1px solid var(--line);border-radius:10px 10px 0 0;
+    transform:translateY(102%);transition:transform .25s ease;box-shadow:0 -6px 24px #3a352733;
+    padding-bottom:env(safe-area-inset-bottom)}
+  #side.open{transform:none}
+  .tabs .x{display:block}
+  .dep{padding:8px 7px}
+}
