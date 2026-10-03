@@ -157,6 +157,15 @@ export class Resolver {
         const hit = this.tryFile(this.norm(`src/${spec.slice(2)}`)) || this.tryFile(this.norm(spec.slice(2)));
         return hit ? [hit] : [];
       }
+      // 项目自定义路径别名（tsconfig paths，如 @contracts/*）
+      if (spec.startsWith("@contracts/")) {
+        const hit = this.tryFile(this.norm(`contracts/${spec.slice(11)}`));
+        return hit ? [hit] : [];
+      }
+      if (spec.startsWith("@db/")) {
+        const hit = this.tryFile(this.norm(`db/${spec.slice(4)}`));
+        return hit ? [hit] : [];
+      }
       // 裸说明符：先排除明显的外部包（@scope/x、react、无斜杠短名）
       if (spec.startsWith("@") || !spec.includes("/")) return [];
       const hit = this.trySuffix(spec);
