@@ -19,6 +19,10 @@ export function isTest(path: string): boolean {
 export function isDoc(path: string): boolean {
   return /\.(md|markdown|mdx|rst|txt|adoc)$/.test(path);
 }
+/** ツールチェーンの設定ファイル：import されなくて当然なので孤立・デッドコードに含めない */
+export function isToolchain(path: string): boolean {
+  return /(^|\/)[^/]*\.config\.[a-z0-9]+$/.test(path);
+}
 
 /** Tarjan の SCC。size>1 の強連結成分をすべて返す */
 export function findCycles(files: GraphNode[]): string[][] {
@@ -69,23 +73,29 @@ export function findCycles(files: GraphNode[]): string[][] {
   return sccs;
 }
 
-export function detectIssues(files: GraphNode[], maxLoc: number, maxFanIn: number): Issue[] {
+/**
+ * @param scriptRefs package.json の scripts から直接参照されているファイルの集合。
+ *   esbuild エントリや seed スクリプトなど、import ではなくコマンド経由で起動される
+ *   ファイルを孤立・デッドコードの誤検出から外すために使う。
+ */
+export function detectIssues(files: GraphNode[], maxLoc: number, maxFanIn: number, scriptRefs: Set<string> = new Set()): Issue[] {
   const issues: Issue[] = [];
+  const exempt = (p: string) => isTest(p) || isEntry(p) || isDoc(p) || isToolchain(p) || scriptRefs.has(p);
 
   // 孤立ファイル：出次数 0 かつ入次数 0 —— 依存グラフから完全に切れている
-  const isolated = files.filter((f) => f.deps.length === 0 && f.usedBy.length === 0 && !isTest(f.path) && !isEntry(f.path) && !isDoc(f.path));
+  const isolated = files.filter((f) => f.deps.length === 0 && f.usedBy.length === 0 && !exempt(f.path));
   if (isolated.length) {
     issues.push({
       type: "isolated",
       severity: isolated.length > files.length * 0.15 ? "medium" : "low",
       title: `孤立ファイル ${isolated.length} 件`,
-      detail: "リポジトリ内の何も import せず、どこからも import されていないファイルです。忘れ去られた旧コード、配線漏れのモジュール、あるいは規約ベースで外部から読み込まれるファイルの可能性があります。1 件ずつ確認する価値があります。",
+      detail: "リポジトリ内の何も import せず、どこからも import されていないファイルです（*.config.* や package.json の scripts から起動されるファイルは除外済み）。忘れ去られた旧コード、配線漏れのモジュール、あるいは規約ベースで外部から読み込まれるファイルの可能性があります。1 件ずつ確認する価値があります。",
       files: isolated.map((f) => f.path).sort(),
     });
   }
 
   // デッドコード疑惑：入次数 0・出次数あり・エントリでもテストでもない
-  const dead = files.filter((f) => f.usedBy.length === 0 && f.deps.length > 0 && !isEntry(f.path) && !isTest(f.path) && !isDoc(f.path));
+  const dead = files.filter((f) => f.usedBy.length === 0 && f.deps.length > 0 && !exempt(f.path));
   if (dead.length) {
     issues.push({
       type: "dead",

@@ -22,6 +22,35 @@ function guessNote(path: string, isT: boolean): string | undefined {
   return undefined;
 }
 
+/**
+ * package.json の scripts に書かれたファイルパスを集める。
+ * 例: "esbuild api/boot.ts --bundle" → api/boot.ts は import されなくても起動入口なので
+ * 孤立・デッドコード判定から外す。monorepo のネストした package.json にも対応。
+ */
+function collectScriptRefs(zipFiles: { path: string; text: string }[], srcPaths: Set<string>): Set<string> {
+  const refs = new Set<string>();
+  for (const f of zipFiles) {
+    if (!/(^|\/)package\.json$/.test(f.path)) continue;
+    let pkg: { scripts?: Record<string, string> };
+    try {
+      pkg = JSON.parse(f.text);
+    } catch {
+      continue;
+    }
+    if (!pkg.scripts) continue;
+    const base = f.path.slice(0, -"package.json".length); // "" または "packages/foo/" など
+    for (const cmd of Object.values(pkg.scripts)) {
+      for (const tok of cmd.split(/\s+/)) {
+        const clean = tok.replace(/^["']+|["']+$/g, "");
+        if (clean.startsWith("-") || !/\.[a-z0-9]+$/i.test(clean)) continue;
+        const p = (base + clean.replace(/^\.\//, "")).replace(/\/{2,}/g, "/");
+        if (srcPaths.has(p)) refs.add(p);
+      }
+    }
+  }
+  return refs;
+}
+
 /** 依赖图：files 顺序稳定，edges 只含仓库内部 */
 function buildGraph(entries: { path: string; text: string; loc: number }[]): GraphNode[] {
   const paths = entries.map((e) => e.path);
@@ -131,7 +160,8 @@ export async function analyzeRepo(input: string, token?: string): Promise<Analys
 
   const maxLoc = Math.max(1, ...graph.map((f) => f.loc));
   const maxFanIn = Math.max(1, ...graph.map((f) => f.usedBy.length));
-  const issues = detectIssues(graph, maxLoc, maxFanIn);
+  const scriptRefs = collectScriptRefs(zipFiles, new Set(src.map((f) => f.path)));
+  const issues = detectIssues(graph, maxLoc, maxFanIn, scriptRefs);
   const edges = graph.reduce((a, f) => a + f.deps.length, 0);
 
   const files: RepoFile[] = graph.map((f) => ({
