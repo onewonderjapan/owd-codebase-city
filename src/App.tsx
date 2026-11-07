@@ -84,6 +84,11 @@ export default function App() {
     }
     setOk(true);
     city.current = c;
+    // 再生成された都市は既定値で生まれるので、ツールバーの現在状態を再生する
+    model.setHeightMode(hMode);
+    c.setFlow(flow);
+    c.setHatch(hatch);
+    c.setSpin(spin);
     c.onSpinChange((v) => setSpin(v));
     return () => {
       c.dispose();

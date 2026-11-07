@@ -36,19 +36,31 @@ function extOf(path: string): string {
   return n.includes(".") ? n.split(".").pop()!.toLowerCase() : "";
 }
 
+const HASH_COMMENT_EXTS = new Set(["py", "pyi", "rb", "sh", "lua", "ex", "exs"]);
+const SLASH_COMMENT_EXTS = new Set([...JS_EXT, "vue", "svelte", ...GO_EXT, ...JAVA_EXT, ...RUST_EXT, ...C_EXT]);
+
 /** 去掉注释与字符串，避免把注释里的 import 当真的 */
-function stripNoise(src: string): string {
-  return src
+function stripNoise(src: string, ext: string): string {
+  let out = src
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/`(?:[^`\\]|\\.)*`/g, "``")
     .replace(/'''[\s\S]*?'''/g, " ")
     .replace(/"""[\s\S]*?"""/g, " ");
+  if (SLASH_COMMENT_EXTS.has(ext)) {
+    // `//` 行注释 —— `:` 前置排除 http(s)://，避免误伤 URL
+    out = out.replace(/(^|[^:])\/\/[^\n]*/gm, "$1");
+  }
+  if (HASH_COMMENT_EXTS.has(ext)) {
+    // Python/Ruby/shell 的整行 `#` 注释（// 是 Python 的整除运算符，只剥整行）
+    out = out.replace(/^[ \t]*\/\/[^\n]*/gm, " ").replace(/^[ \t]*#[^\n]*/gm, " ");
+  }
+  return out;
 }
 
 /** 抽出原始 import 说明符 */
 export function extractSpecifiers(path: string, text: string): string[] {
   const ext = extOf(path);
-  const src = stripNoise(text);
+  const src = stripNoise(text, ext);
   const out: string[] = [];
   const push = (s?: string) => { if (s) out.push(s); };
 
@@ -118,6 +130,9 @@ export class Resolver {
 
   private tryFile(base: string): string | null {
     if (!base) return null;
+    // 说明符本身就是一个存在的文件（如 #include "foo.h"）时直接命中，
+    // 否则 foo.h 会被剥成 foo 而误连到同名的 foo.c / foo.tsx
+    if (this.paths.includes(base)) return base;
     // TS 的 ESM 导入常写成 ./x.js 而实际文件是 x.ts —— 显式扩展名先剥掉
     const m = base.match(/\.(js|jsx|ts|tsx|mjs|cjs|mts|cts|py|pyi|go|java|rs|rb|vue|svelte|h|c|hpp|hh|cpp|cc|cxx)$/i);
     if (m) base = base.slice(0, -m[0].length);
@@ -188,12 +203,16 @@ export class Resolver {
     }
 
     if (GO_EXT.includes(ext)) {
-      if (!this.hasGoMod || !this.goModule || !spec.startsWith(this.goModule)) return [];
+      if (!this.hasGoMod || !this.goModule) return [];
+      // 模块名必须整段匹配，github.com/x/foo 不能吞掉 github.com/x/foobar
+      if (spec !== this.goModule && !spec.startsWith(this.goModule + "/")) return [];
       const rel = spec.slice(this.goModule.length).replace(/^\//, "");
       if (!rel) return [];
-      // 包级依赖：连到目标目录下所有 go 文件（封顶，避免一只包连出几百条边）
+      // 包级依赖：只连目标目录（不含子目录）下的 go 文件，封顶避免巨包连出几百条边
       const prefix = rel.endsWith("/") ? rel : rel + "/";
-      const hits = this.paths.filter((p) => p.startsWith(prefix) && p.endsWith(".go"));
+      const hits = this.paths.filter(
+        (p) => p.endsWith(".go") && p.startsWith(prefix) && !p.slice(prefix.length).includes("/"),
+      );
       return hits.slice(0, 12);
     }
 

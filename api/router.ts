@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { analyses } from "../db/schema";
@@ -94,9 +94,9 @@ export const appRouter = createRouter({
           updatedAt: analyses.updatedAt,
         })
         .from(analyses)
-        .orderBy(analyses.updatedAt)
+        .orderBy(desc(analyses.updatedAt))
         .limit(12);
-      return rows.reverse();
+      return rows;
     }),
   }),
 });

@@ -30,6 +30,13 @@ const MARK_COLORS: Record<number, string> = {
 };
 const ISO_COLOR = "#ff3d5e";
 
+/** ツールチップ用 HTML エスケープ —— 解析対象リポジトリのファイル名は生文字列 */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+  );
+}
+
 export function createCity(
   cv: HTMLCanvasElement | null,
   stage: HTMLDivElement | null,
@@ -426,7 +433,7 @@ export function createCity(
       tip!.style.display = "block";
       tip!.style.left = hover.sx + "px";
       tip!.style.top = hover.sy + "px";
-      tip!.innerHTML = `<b>${hover.name}</b> · ${hover.loc} 行<br>${hover.dir} · ${hover.usedBy.length} 箇所から参照${hover.isolated ? "<br>⚠ 孤立ファイル" : ""}`;
+      tip!.innerHTML = `<b>${escapeHtml(hover.name)}</b> · ${hover.loc} 行<br>${escapeHtml(hover.dir)} · ${hover.usedBy.length} 箇所から参照${hover.isolated ? "<br>⚠ 孤立ファイル" : ""}`;
     } else tip!.style.display = "none";
 
     renderer!.render(scene, camera);
