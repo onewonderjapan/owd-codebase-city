@@ -118,29 +118,29 @@ export function detectIssues(files: GraphNode[], maxLoc: number, maxFanIn: numbe
     });
   }
 
-  // 巨大ファイル
+  // 巨大ファイル（先に並べ替えてから giants[0] を読む）
   const giantThreshold = Math.max(600, maxLoc * 0.7);
-  const giants = files.filter((f) => f.loc >= giantThreshold);
+  const giants = files.filter((f) => f.loc >= giantThreshold).sort((a, b) => b.loc - a.loc);
   if (giants.length) {
     issues.push({
       type: "giant",
       severity: giants.some((f) => f.loc >= 1500) ? "high" : "medium",
       title: `巨大ファイル ${giants.length} 件`,
       detail: `最大のファイル ${giants[0]?.path ?? ""} は ${maxLoc} 行あります。ファイルが大きいほどレビューが難しくコンフリクトも起きやすい。分割の第一候補です。`,
-      files: giants.sort((a, b) => b.loc - a.loc).map((f) => f.path),
+      files: giants.map((f) => f.path),
     });
   }
 
-  // ハブファイル：大量に依存されている —— 変更の影響範囲が甚大
+  // ハブファイル：大量に依存されている —— 変更の影響範囲が甚大（先に並べ替えてから hubs[0] を読む）
   const hubThreshold = Math.max(8, Math.ceil(maxFanIn * 0.6));
-  const hubs = files.filter((f) => f.usedBy.length >= hubThreshold);
+  const hubs = files.filter((f) => f.usedBy.length >= hubThreshold).sort((a, b) => b.usedBy.length - a.usedBy.length);
   if (hubs.length) {
     issues.push({
       type: "hub",
       severity: hubs.some((f) => f.usedBy.length >= 20) ? "medium" : "low",
       title: `ハブファイル ${hubs.length} 件`,
       detail: `最も参照されている ${hubs[0]?.path ?? ""} は ${maxFanIn} 箇所から import されています。必ずしも悪ではありませんが、シグネチャの変更は街全体に波及します。変更前に依存元の一覧を確認してください。`,
-      files: hubs.sort((a, b) => b.usedBy.length - a.usedBy.length).map((f) => f.path),
+      files: hubs.map((f) => f.path),
     });
   }
 

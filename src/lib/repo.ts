@@ -159,7 +159,8 @@ export function buildModel(REPO: RepoFile[], issues: Issue[] = []): Model {
     shadeOf.set(d, sibs.length > 1 ? sibs.indexOf(d) / (sibs.length - 1) : 0.5);
   }
 
-  const maxLoc = Math.max(...files.map((f) => f.loc));
+  // 全文件 0 行时避免 0/0 → NaN 高度
+  const maxLoc = Math.max(1, ...files.map((f) => f.loc));
   const maxUse = Math.max(1, ...files.map((f) => f.usedBy.length));
   const totalLoc = files.reduce((a, f) => a + f.loc, 0);
   let heightMode = "loc";
